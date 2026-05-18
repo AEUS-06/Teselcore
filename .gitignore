@@ -1,0 +1,89 @@
+```gitignore
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# =========================
+# Build / binaries
+# =========================
+*.o
+*.obj
+*.exe
+*.out
+*.dll
+*.so
+*.a
+
+# =========================
+# LaTeX
+# =========================
+*.aux
+*.log
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+
+# =========================
+# PDFs temporales
+# =========================
+document/**/*.pdf
+
+# Mantener SOLO el paper principal
+!document/Fundamentos Matemáticos de la Convolución Aperiódica basada en Teselación de Penrose para Redes Neuronales Ligeras.pdf
+
+# =========================
+# Ignorar carpetas documentales temporales
+# =========================
+document/arquitectura_penrose_model/
+document/divulgacion/
+document/español/
+document/ingles/
+document/Penrose/
+
+# =========================
+# Resultados experimentales pesados
+# =========================
+experimentos/mnist/datos_mnist/
+experimentos/mnist/__pycache__/
+experimentos/mnist/resultados/
+
+# =========================
+# Python package cache
+# =========================
+teselcore-python/__pycache__/
+
+# =========================
+# VSCode / IDE
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+```
+
+# =========================
+# Archivos 
+# =========================
+*.svg
+*.png
+*.csv
+*.json
+!kernel_flow(2).svg
+
+# =========================
+# Modelos preentrenados
+# =========================
+*.ax
