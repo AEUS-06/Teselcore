@@ -152,6 +152,40 @@ core.run_demo()
 
 **Experimentos MNIST:**
 
+> [!WARNING]
+> **La complejidad crece con φ — no con N. Eso importa.**
+>
+> El costo del forward pass está dado por:
+>
+> $$O(B \cdot C_{out} \cdot C_{in} \cdot T_n \cdot H_s \cdot W_s)$$
+>
+> donde $T_n \sim \varphi^{2n} \cdot 10$ es el número de tejas al nivel $n$, y $\varphi \approx 1.618$.
+> Cada nivel no suma tejas — las multiplica por $\varphi^2 \approx 2.618$.
+> Encima, el gradiente numérico ejecuta **2 forward passes por cada parámetro**.
+> El costo se apila rápido.
+
+> [!TIP]
+> **Configuración mínima — la que realmente funciona:**
+> ```bash
+> python entrenar.py \
+>   --nivel   1   \
+>   --batch   256 \
+>   --canales 16  \
+>   --bloques 2   \
+>   --K       3   \
+>   --eps_num 1e-3
+> ```
+> Con `--nivel 1` tienes ~20 tejas. Con `--batch 256` el gradiente numérico
+> tiene suficientes muestras para no ser puro ruido. Es el punto de entrada más bajo
+> que tiene sentido intentar.
+
+> [!NOTE]
+> Si ni con esa configuración arranca en tu máquina — abre un issue o escríbeme directo.
+> Sé que la complejidad tiene solución, todavía no encontré la forma de bajarla
+> sin romper el núcleo. Es trabajo en progreso, y si tienes ideas, más razón para abrir ese PR.
+>
+> 📧 [axedus06@gmail.com](mailto:axedus06@gmail.com) · [GitHub Issues](https://github.com/AEUS-06/TeselCore/issues)
+
 ```bash
 cd experimentos/mnist
 python entrenar.py
