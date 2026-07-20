@@ -174,6 +174,8 @@ typedef struct {
 int        tc_guardar               (const tc_modelo* modelo, const char* ruta);
 tc_modelo* tc_cargar                (const char* ruta);
 void       tc_liberar_modelo        (tc_modelo* modelo);
+
+void       tc_liberar_modelo_estructura(tc_modelo* modelo);
 tc_modelo* tc_modelo_nuevo          (const char* metadatos_json);
 int        tc_modelo_agregar_tensor (tc_modelo* modelo, const char* nombre, tc_tensor* t);
 tc_tensor* tc_modelo_obtener_tensor (const tc_modelo* modelo, const char* nombre);

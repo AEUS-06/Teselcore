@@ -41,7 +41,6 @@ Por ahora es experimental. Y eso es exactamente el punto.
 ## 🧠 La filosofía del proyecto
 
 ```
-                                                          
    ◈  matemáticas         ◈  física curiosa         ◈  ideas de las 2am
       que nadie usa          sin terminar               que no te dejan
       en producción          de entender                dormir
@@ -51,7 +50,7 @@ Por ahora es experimental. Y eso es exactamente el punto.
                                   ▼
                     ╔═════════════════════════╗
                     ║                         ║
-                    ║   T E S E L C O R E  ║
+                    ║      T E S E L C O R E  ║
                     ║                         ║
                     ╚═════════════════════════╝
                                   │
@@ -75,23 +74,181 @@ Esas son las preguntas que viven aquí.
 
 ```
 TeselCore/
-├── 🔧 teselcore-nucleo/     ← Motor en C. Rápido, crudo, sin adornos.
-│   ├── src/                 ← Código fuente del kernel
-│   ├── include/teselcore.h  ← Interfaz pública
-│   ├── tests/               ← Tests del núcleo
-│   └── Makefile
 │
-├── 🐍 teselcore-python/     ← Bindings Python para que no tengas que sufrir con C
-│   └── teselcore.py
+├── 🔧 teselcore-nucleo/          ← Motor en C. Crudo, modular, sin adornos.
+│   ├── src/                      ── 56 archivos fuente en 14 módulos ──
+│   │   ├── activations/          ReLU, GELU, SiLU, Sigmoid, Tanh, Softmax
+│   │   ├── autograd/             Backward automático (tape graph)
+│   │   ├── cli/                  Interfaz CLI: main, info, gen, load, save_demo, conv_demo
+│   │   ├── core/                 Helpers internos, RNG (xoshiro256**), gestión de tape
+│   │   ├── layers/               Linear, Conv2D, BatchNorm, Dropout, Embedding, Pooling
+│   │   ├── linalg/               MatMul, Transpose, Reshape, Concat
+│   │   ├── loss/                 Cross-entropy, MSE, Binary Cross-entropy
+│   │   ├── modelo/               Serialización .ax: guardar, cargar, CRC32, I/O binario
+│   │   ├── ops/                  Add, Sub, Mul, Div, Neg, Pow, Exp, Log, Sqrt, Abs
+│   │   ├── optimizador/          SGD, Adam, AdamW — creación, paso, gestión
+│   │   ├── penrose/              ⬡ El corazón: teselación, subdivisión, semilla,
+│   │   │                           vecindad, kernel, interpolación, conv_grafo,
+│   │   │                           conv_imagen, proyección imagen↔teselación,
+│   │   │                           SVG export, backward de Penrose, bbox
+│   │   ├── reduce/               Sum, Min, Max, Mean
+│   │   ├── tensor/               Creación: zeros, ones, random, from_data, lifecycle
+│   │   └── utils/                Utilidades varias
+│   │
+│   ├── include/
+│   │   ├── teselcore.h           ← API pública (200 líneas, toda la interfaz)
+│   │   └── internal/             Headers internos
+│   │
+│   ├── demos/
+│   │   └── visualizar_kernel.c   Genera SVG del kernel de Penrose
+│   │
+│   ├── tests/
+│   │   └── integration/
+│   │       └── test_penrose_completo.c  Prueba end-to-end: forward+backward+save/load
+│   │
+│   └── Makefile                  Build: lib, .so, CLI, test
 │
-├── 🧪 experimentos/         ← Aquí es donde la magia (y el caos) ocurre
-│   └── mnist/               ← ¿Penrose vs CNN? Sí, eso existe aquí.
-│       ├── entrenar.py
-│       ├── probar_modelos.py
-│       └── graficar_resultados.py
+├── 🐍 teselcore-python/          ← Bindings Python (ctypes al C nativo)
+│   └── teselcore/
+│       ├── tensor.py             Tensor con autograd y operadores sobrecargados
+│       ├── penrose.py            Teselacion, KernelPenrose, convolución en grafo/imagen
+│       ├── modelo.py             Modelo: guardar/cargar .ax
+│       ├── optimizador.py        SGD, Adam, AdamW
+│       └── perdidas.py           Entropía cruzada, MSE, BCE
 │
-└── 📄 document/             ← Documentación, notas, artefactos matemáticos
+├── 🧪 experimentos/              ← Donde las ideas chocan contra la realidad
+│   └── mnist/                    PenroseNet vs CNNClasico en MNIST
+│       ├── penrose_net.py        PenroseNet: teselación→grafo→bloques residuales
+│       ├── entrenar_penrose.py   Entrenamiento híbrido: grad numérico + autograd
+│       ├── probar_modelos.py     Evaluación y matrices de confusión
+│       └── graficar_resultados.py  Visualización comparativa
+│
+├── 👴 (Legacy V1)/               ← El prototipo monolítico original. Historia viva.
+│
+└── 📄 document/                  ← Paper principal en PDF
 ```
+
+---
+
+## ⚙️ Cómo funciona esto por dentro
+
+### 🧮 El algoritmo de teselación
+
+Penrose no se dibuja. Se *cultiva*. El núcleo implementa subdivisión por **deflación**: empiezas con una semilla y en cada iteración cada baldosa se parte en piezas más pequeñas siguiendo reglas geométricas fijas, gobernadas por φ. Tras `n` iteraciones tienes `O(φ²ⁿ)` baldosas formando una teselación que cubre el plano sin repetirse jamás.
+
+```
+      Iteración 0          Iteración 1          Iteración 2
+
+        ╱▔╲                ╱╲  ╱╲             ╱╲╱╲╱╲╱╲
+       ╱   ╲              ╱  ╲╱  ╲           ╱  ╲╱  ╲╱
+      ╱     ╲            ╱  ╱╲  ╱╲          ╱ ╱╲ ╱╲ ╱╲
+      ╲     ╱            ╲ ╱  ╲╱  ╱         ╲╱ ╲╱ ╲╱ ╲
+       ╲   ╱              ╲╱  ╲╱            ╲╱╲╱╲╱╲╱╲
+        ╲╱              kite    dart         ╲╱╲╱╲╱╲╱
+
+      semilla            1 deflación         2 deflaciones
+```
+
+### ⬡ Convolución aperiódica — la idea central
+
+Una convolución normal desliza un kernel cuadrado sobre una cuadrícula regular. TeselCore hace algo distinto:
+
+```
+  ┌─────────────────────────────────────────────────────────┐
+  │                                                         │
+  │   CONVOLUCIÓN ESTÁNDAR          CONVOLUCIÓN TESELADA   │
+  │                                                         │
+  │   ┌───┬───┬───┐                ⬗ ⬔ ⬕ ⬗ ⬔ ⬕ ⬗         │
+  │   │ w │ w │ w │               ⬕ ⬗ ⬔ ⬕ ⬗ ⬔ ⬕ ⬗        │
+  │   ├───┼───┼───┤               ⬔ ⬕ ⬗ ⬔ ⬕ ⬗ ⬔ ⬕        │
+  │   │ w │ w │ w │               ⬗ ⬔ ⬕ ⬗ ⬔ ⬕ ⬗ ⬔        │
+  │   ├───┼───┼───┤               ⬕ ⬗ ⬔ ⬕ ⬗ ⬔ ⬕ ⬗        │
+  │   │ w │ w │ w │               ⬔ ⬕ ⬗ ⬔ ⬕ ⬗ ⬔ ⬕        │
+  │   └───┴───┴───┘               ⬗ ⬔ ⬕ ⬗ ⬔ ⬕ ⬗ ⬔        │
+  │                                                         │
+  │   Kernel 3×3                  Kernel Penrose nivel 3   │
+  │   → 9 pesos fijos             → ~160 nodos en grafo    │
+  │   → simetría traslacional     → sin periodicidad       │
+  │   → vecinos cardinales        → vecinos geométricos φ  │
+  │                                                         │
+  └─────────────────────────────────────────────────────────┘
+```
+
+**Dos modos de convolución:**
+
+| Modo | Descripción | Complejidad |
+|------|-------------|-------------|
+| `conv_grafo` | Cada nodo se agrega con sus vecinos geométricos | `O(N · d · Cᵢₙ · C_out)`, `d ≈ 6.5` |
+| `conv_imagen` | Proyecta la teselación sobre la imagen con interpolación bilineal | `O(N · A · Cᵢₙ · C_out)` |
+
+### 🧬 Autograd en C puro — sin PyTorch
+
+El núcleo tiene su propio sistema de diferenciación automática escrito en C. Cada operación registra su función de gradiente en un tape. Cuando llamas a `tc_backward()`, el grafo se recorre en orden topológico inverso aplicando la regla de la cadena. Sin recolector de basura, sin magia. Solo C, punteros y una pila.
+
+```
+  ┌───────────────────────────────┐
+  │  tc_tensor                    │
+  │  ├── data      ← float*      │
+  │  ├── grad      ← float*      │
+  │  └── autograd  ─────────────►│──► _nodo_autograd
+  └───────────────────────────────┘         │
+                                             ├── backward_fn  ← regla de la cadena
+                                             ├── inputs[]     ← tensores padre
+                                             └── saved        ← intermedios
+```
+
+Operaciones con gradiente soportadas: Add, Sub, Mul, Div, Neg, Pow, Exp, Log, Sqrt, MatMul, Conv2D, Pooling, Reshape, Transpose, ReLU, GELU, SiLU, Sigmoid, Tanh, Softmax, BatchNorm, Dropout, CrossEntropy, MSE, BCE — y **ConvPenrose**.
+
+### 📦 Formato .ax — serialización binaria propia
+
+Los modelos se guardan en `.ax`, un formato binario compacto con checksum CRC32. Si el archivo está corrupto, el núcleo se niega a cargarlo. Sin preguntas.
+
+```
+  ┌──────────────────────────────────────────┐
+  │  "TESELCORE_AX"   ← magic bytes         │
+  │  version          ← u32                 │
+  │  n_tensores       ← u64                 │
+  │  [ nombre · tipo · shape · data ] × N   │
+  │  crc32            ← checksum final      │
+  └──────────────────────────────────────────┘
+```
+
+### 🧠 PenroseNet — la arquitectura experimental
+
+```
+  ┌──────────┐   ┌────────────┐   ┌───────────────┐   ┌──────────┐
+  │  Entrada │──►│ imagen →   │──►│ PenroseBlock  │──►│ Dual     │──►
+  │  28×28   │   │ teselación │   │ (residual)    │   │ Pool     │
+  └──────────┘   └────────────┘   └───────────────┘   └────┬─────┘
+                                                            │
+                         ┌──────────┐   ┌──────────┐       │
+                         │  Salida  │◄──│  FC      │◄──────┘
+                         │  10      │   │  256→10  │
+                         └──────────┘   └──────────┘
+
+  Optimización híbrida:
+  ┌─────────────────────────────────────────────────┐
+  │  Penrose  →  gradientes numéricos (diferencias  │
+  │              centrales, LR × 0.5)               │
+  │  Denso    →  autograd estándar (LR normal)      │
+  │  Scheduler coseno sobre ambos grupos            │
+  └─────────────────────────────────────────────────┘
+```
+
+**PenroseBlock:** LayerNorm → ConvPenroseGrafo → GELU → Dropout → conexión residual.  
+**DualPool:** pooling independiente por tipo de baldosa (kite vs dart), aprovechando la dualidad geométrica de Penrose.
+
+### ⚡ Tabla de complejidad
+
+| Operación | Tiempo | Espacio |
+|-----------|--------|---------|
+| Generar teselación nivel L | `O(φ²ᴸ)` | `O(φ²ᴸ)` |
+| Construir grafo de vecindad | `O(N log N)` | `O(N · d)` |
+| ConvPenrose forward | `O(N · d · Cᵢₙ · C_out)` | `O(N · C_out)` |
+| ConvPenrose backward | `O(N · d · Cᵢₙ · C_out)` | `O(N · d)` |
+| Guardar / cargar .ax | `O(params)` | `O(params)` |
+
+Para MNIST (28×28): PenroseNet tiene ~15× menos parámetros que una CNN clásica comparable — 70μs/imagen vs 2400μs. La precisión (32% vs 83%) todavía no está a la par, pero la geometría es prometedora. Por eso esto es un laboratorio, no un producto.
 
 ---
 
@@ -110,8 +267,6 @@ cd teselcore-nucleo
 make
 ```
 
-En Windows esto genera `teselcore_cli.exe`. En Unix, el binario correspondiente.
-
 **2. Instalar el paquete Python:**
 
 ```bash
@@ -125,15 +280,52 @@ pip install -e .
 python -m venv venv
 source venv/bin/activate        # Linux/macOS
 venv\Scripts\activate           # Windows
-
 pip install -r experimentos/requirements.txt
 ```
 
 ---
 
+## ⚡ Antes de entrenar — lee esto
+
+> [!WARNING]
+> **La complejidad crece con φ, no con N. Eso importa.**
+>
+> El costo del forward pass completo es:
+>
+> **O(B · C_out · C_in · Tₙ · Hₛ · Wₛ)**
+>
+> donde **Tₙ ≈ φ²ⁿ · 10** es el número de tejas al nivel `n`, y **φ ≈ 1.618**.
+> Cada nivel no suma tejas — las multiplica por φ² ≈ 2.618.
+> Encima, el gradiente numérico ejecuta **2 forward passes por cada parámetro**.
+> El costo se apila rápido.
+
+> [!TIP]
+> **Configuración mínima — la que realmente funciona:**
+> ```bash
+> python entrenar_penrose.py \
+>   --nivel   1   \
+>   --batch   256 \
+>   --canales 16  \
+>   --bloques 2   \
+>   --K       3   \
+>   --eps_num 1e-3
+> ```
+> Con `--nivel 1` tienes ~20 tejas. Con `--batch 256` el gradiente numérico
+> tiene suficientes muestras para no ser puro ruido.
+> Es el punto de entrada más bajo que tiene sentido intentar.
+
+> [!NOTE]
+> Si ni con esa configuración arranca en tu máquina — abre un issue o escríbeme.
+> Sé que la complejidad tiene solución, todavía no encontré la forma de bajarla
+> sin romper el núcleo. Es trabajo en progreso, y si tienes ideas, más razón para abrir ese PR.
+>
+> 📧 [axedus06@gmail.com](mailto:axedus06@gmail.com) · [Issues](https://github.com/AEUS-06/TeselCore/issues)
+
+---
+
 ## ⚡ Uso rápido
 
-**Desde la CLI del núcleo:**
+**Desde la CLI:**
 
 ```bash
 cd teselcore-nucleo
@@ -145,7 +337,6 @@ cd teselcore-nucleo
 
 ```python
 from teselcore import TeselCore
-
 core = TeselCore()
 core.run_demo()
 ```
@@ -188,7 +379,7 @@ core.run_demo()
 
 ```bash
 cd experimentos/mnist
-python entrenar.py
+python entrenar_penrose.py
 python probar_modelos.py
 python graficar_resultados.py
 ```
@@ -197,16 +388,12 @@ python graficar_resultados.py
 
 ## 🧪 Tests
 
-Para el núcleo C:
-
 ```bash
+# Núcleo C
 cd teselcore-nucleo
 make test
-```
 
-Para Python:
-
-```bash
+# Python
 pytest
 ```
 
@@ -304,15 +491,15 @@ Si llegaste leyendo hasta acá, probablemente tienes algo raro dando vueltas en 
 
 ## 📖 Citación
 
-Si usas TeselCore en trabajos académicos, investigaciones o proyectos derivados, por favor cita:
+Si usas TeselCore en trabajos académicos o proyectos derivados:
 
 ```bibtex
 @misc{atekokoliAEUS2026teselcore,
-  author = {Axel Eduardo Urbina Secundino},
-  title  = {Fundamentos Matemáticos de la Convolución Aperiódica basada en
-            Teselación de Penrose para Redes Neuronales Ligeras},
-  year   = {2026},
-  note   = {Preprint técnico},
+  author       = {Axel Eduardo Urbina Secundino},
+  title        = {Fundamentos Matemáticos de la Convolución Aperiódica
+                  basada en Teselación de Penrose para Redes Neuronales Ligeras},
+  year         = {2026},
+  note         = {Preprint técnico},
   howpublished = {\url{https://github.com/AEUS-06/TeselCore}}
 }
 ```
@@ -321,15 +508,15 @@ Si usas TeselCore en trabajos académicos, investigaciones o proyectos derivados
 
 ## 🤝 ¿Quieres contribuir?
 
-Si llegaste hasta aquí es porque algo de esto te pareció interesante. Eso ya es suficiente razón para contribuir.
+Si llegaste hasta aquí es porque algo de esto te pareció interesante. Eso ya es suficiente razón.
 
-1. Haz un fork y crea una rama con nombre descriptivo
+1. Haz un fork y crea una rama descriptiva
 2. Agrega tests para cualquier cambio funcional
-3. Abre un Pull Request con contexto y pasos para reproducir
+3. Abre un Pull Request a `dev` — no a `main` — con contexto y pasos para reproducir
 
 ¿Tienes una idea rara que no sabes si encaja? Abre un issue de todas formas. Las ideas raras son exactamente lo que este proyecto necesita.
 
-Y si usas TeselCore en algún proyecto o experimento, **menciónanoslo en redes** — me encantaría ver qué construyes con esto.
+Y si usas TeselCore en algún proyecto, **menciónanoslo en redes** — me encantaría ver qué construyes con esto.
 
 ---
 
@@ -342,7 +529,7 @@ Consulta el archivo `LICENSE` para más detalles.
 
 ## 📬 Contacto
 
-¿Tienes una idea rara, una pregunta o simplemente quieres hablar de geometría aperiódica a las 2am? Aquí me encuentras:
+¿Tienes una idea rara, una pregunta o simplemente quieres hablar de geometría aperiódica a las 2am?
 
 <div align="center">
 
@@ -355,7 +542,7 @@ Consulta el archivo `LICENSE` para más detalles.
 
 </div>
 
-O simplemente abre un [issue](https://github.com/AEUS-06/TeselCore/issues) o un Pull Request directamente en el repositorio.
+O simplemente abre un [issue](https://github.com/AEUS-06/TeselCore/issues) directamente en el repositorio.
 
 ---
 
