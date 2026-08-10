@@ -11,6 +11,7 @@
 
 ### *Un kernel experimental donde las teselaciones de Penrose se convierten en redes neuronales. Sí, es tan raro como suena.*
 
+[![DOI](https://doi.org/10.5281/zenodo.21865880)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blueviolet.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![C](https://img.shields.io/badge/Core-C99-orange?logo=c&logoColor=white)](https://en.wikipedia.org/wiki/C99)
